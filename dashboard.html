@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⛳ Golf Sharp Money Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:      #0a0e14;
+    --surface: #111720;
+    --border:  #1e2a38;
+    --green:   #00e5a0;
+    --red:     #ff4d6d;
+    --yellow:  #f5c842;
+    --blue:    #4d9fff;
+    --muted:   #4a5568;
+    --text:    #e2e8f0;
+    --sub:     #718096;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 200;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 3px; color: var(--green); }
+  .logo span { color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .last-update { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--sub); }
+
+  select#eventSelect {
+    background: var(--bg);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 12px;
+    cursor: pointer;
+    outline: none;
+    min-width: 200px;
+  }
+  select#eventSelect option { background: var(--surface); }
+
+  .pull-btn {
+    background: transparent; border: 1px solid var(--green); border-radius: 8px;
+    color: var(--green); cursor: pointer; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 600; padding: 7px 16px;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .pull-btn:hover { background: var(--green); color: #000; }
+  .pull-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Main ── */
+  main { max-width: 1600px; margin: 0 auto; padding: 24px 18px; }
+
+  /* ── Picks Banner ── */
+  .picks-banner {
+    background: linear-gradient(135deg, #0d2018 0%, #0a1a2e 100%);
+    border: 1px solid var(--green);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 22px;
+  }
+  .picks-banner h2 {
+    font-family: 'Bebas Neue', sans-serif; font-size: 16px;
+    letter-spacing: 3px; color: var(--green); margin-bottom: 12px;
+  }
+  .picks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+  }
+  .pick-chip {
+    background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.3);
+    border-radius: 8px; padding: 8px 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .pick-rank {
+    background: var(--green); color: #000; border-radius: 50%;
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .pick-info { display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+  .pick-name { font-size: 13px; font-weight: 600; color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pick-delta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--sub); }
+  .pick-pending { font-size: 12px; color: var(--sub); font-style: italic; }
+
+  /* ── Toolbar ── */
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
+  .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 3px; color: var(--sub); }
+  .toolbar-right { display: flex; align-items: center; gap: 14px; }
+  .display-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--sub); }
+
+  /* ── Table ── */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+  thead tr { background: #0d1520; }
+
+  th {
+    font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500;
+    letter-spacing: 1.2px; text-transform: uppercase; color: var(--sub);
+    padding: 11px 10px; text-align: right;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap; cursor: pointer; user-select: none; transition: color 0.15s;
+  }
+  th:first-child { text-align: left; cursor: default; }
+  th:nth-child(2) { text-align: left; }
+  th:hover:not(:first-child) { color: var(--text); }
+  th.sort-asc::after  { content: ' ↑'; color: var(--green); }
+  th.sort-desc::after { content: ' ↓'; color: var(--green); }
+  th.group-start, td.group-start { border-left: 1px solid var(--border); }
+
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; cursor: pointer; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #151e2a; }
+  tbody tr.qualifying { background: rgba(0,229,160,0.04); }
+  tbody tr.qualifying:hover { background: rgba(0,229,160,0.09); }
+
+  td { padding: 9px 10px; font-size: 12px; text-align: right; }
+  td:first-child { text-align: left; }
+  td:nth-child(2) { text-align: left; }
+
+  .player-name { font-weight: 600; font-size: 13px; }
+  .longshot-badge {
+    display: inline-block; background: rgba(245,200,66,0.15); color: var(--yellow);
+    border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    padding: 2px 5px; margin-left: 6px; vertical-align: middle;
+  }
+  .qualify-badge {
+    display: inline-block; background: rgba(0,229,160,0.15); color: var(--green);
+    border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    padding: 2px 5px; margin-left: 6px; vertical-align: middle;
+  }
+  .pending-badge {
+    display: inline-block; background: rgba(245,200,66,0.1); color: var(--yellow);
+    border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    padding: 2px 5px; margin-left: 6px; vertical-align: middle;
+  }
+  .mono { font-family: 'DM Mono', monospace; font-size: 11px; }
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .pending-cell { color: var(--muted); font-size: 10px; font-family: 'DM Mono', monospace; }
+
+  /* Result cell */
+  .result-cell { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--yellow); }
+  .result-cell.empty { color: var(--muted); }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 500;
+    align-items: stretch; justify-content: center; padding: 12px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    width: 100%; max-width: 860px;
+    display: flex; flex-direction: column;
+    overflow: hidden; padding: 0;
+  }
+  .modal-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .modal-player-name { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; }
+  .modal-event { font-size: 10px; color: var(--sub); }
+  .close-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--sub); cursor: pointer; font-size: 15px; padding: 3px 9px;
+    flex-shrink: 0; transition: border-color 0.2s; line-height: 1.4;
+  }
+  .close-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* Stats: one tight row across the top */
+  .modal-stats { display: flex; gap: 0; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+  .stat-card {
+    flex: 1; padding: 8px 10px; border-right: 1px solid var(--border);
+  }
+  .stat-card:last-child { border-right: none; }
+  .stat-label { font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--sub); margin-bottom: 3px; font-family: 'DM Mono', monospace; }
+  .stat-row { display: flex; gap: 10px; align-items: baseline; }
+  .stat-group { display: flex; flex-direction: column; gap: 1px; }
+  .stat-sublabel { font-size: 7px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .stat-val { font-size: 12px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .stat-val.small { font-size: 11px; color: var(--sub); }
+  .stat-move { font-size: 9px; font-family: 'DM Mono', monospace; margin-top: 1px; }
+
+  /* Chart fills remaining space */
+  .chart-wrap {
+    flex: 1; padding: 10px 12px; min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .chart-canvas-wrap { flex: 1; position: relative; min-height: 0; }
+  .chart-title { font-family: 'Bebas Neue', sans-serif; font-size: 11px; letter-spacing: 2px; color: var(--muted); margin-bottom: 6px; flex-shrink: 0; }
+
+  .loading { text-align: center; padding: 50px 0; color: var(--sub); font-size: 13px; }
+  .spinner { display: inline-block; width: 26px; height: 26px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⛳ Sharp<span>Golf</span></div>
+  <div class="header-right">
+    <select id="eventSelect">
+      <option value="">Loading events...</option>
+    </select>
+    <button class="pull-btn" id="pullBtn" onclick="pullNow()">⬇ Pull Now</button>
+    <div class="last-update" id="lastUpdate">—</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Picks Banner: Top 10 -->
+  <div class="picks-banner">
+    <h2>📡 Top 10 Sharp Money Movers — All 3 Buckets Improving · Win Odds ≤ +5000</h2>
+    <div class="picks-grid" id="picksList">
+      <span class="pick-pending">Waiting for data...</span>
+    </div>
+  </div>
+
+  <!-- Longshots Banner -->
+  <div class="picks-banner" style="border-color:var(--yellow);background:linear-gradient(135deg,#1a1500 0%,#0a1a2e 100%);margin-bottom:22px">
+    <h2 style="color:var(--yellow)">🎲 Top 5 Longshots — All Criteria Met · Win Odds &gt; +5000</h2>
+    <div class="picks-grid" id="longshotsList">
+      <span class="pick-pending">Waiting for data...</span>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="toolbar">
+    <div class="section-title">All Players</div>
+    <div class="toolbar-right">
+      <button id="oddsToggleBtn" onclick="toggleDisplay()" style="
+        background:transparent;border:1px solid var(--border);border-radius:8px;
+        color:var(--sub);cursor:pointer;font-family:'DM Mono',monospace;
+        font-size:11px;padding:6px 14px;transition:all 0.2s;white-space:nowrap;
+      ">Show Implied %</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th onclick="sortBy('player')">Player</th>
+          <th onclick="sortBy('result')" class="group-start">Result</th>
+          <th onclick="sortBy('baseline')">Baseline</th>
+          <th onclick="sortBy('current_total')">Current</th>
+          <th onclick="sortBy('delta')">Δ Total</th>
+          <th class="group-start" onclick="sortBy('winner_open')">Win Open</th>
+          <th onclick="sortBy('winner_current')">Win Now</th>
+          <th onclick="sortBy('winner_move')">Win Δ</th>
+          <th class="group-start" onclick="sortBy('top5_open')">T5 Open</th>
+          <th onclick="sortBy('top5_current')">T5 Now</th>
+          <th onclick="sortBy('top5_move')">T5 Δ</th>
+          <th class="group-start" onclick="sortBy('top10_open')">T10 Open</th>
+          <th onclick="sortBy('top10_current')">T10 Now</th>
+          <th onclick="sortBy('top10_move')">T10 Δ</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="15"><div class="loading"><div class="spinner"></div><br>Fetching odds data...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Player Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modalContent"
+    ontouchstart="swipeStartX=event.changedTouches[0].clientX"
+    ontouchend="handleSwipe(event)">
+    <div class="modal-header">
+      <button class="close-btn" onclick="navigatePlayer(-1)" style="padding:4px 10px;font-size:18px;border-color:var(--border)">‹</button>
+      <div style="flex:1;text-align:center">
+        <div class="modal-player-name" id="modalName"></div>
+        <div class="modal-event" id="modalEvent"></div>
+      </div>
+      <button class="close-btn" onclick="navigatePlayer(1)" style="padding:4px 10px;font-size:18px;border-color:var(--border)">›</button>
+      <button class="close-btn" onclick="closeModalDirect()" style="margin-left:4px">✕</button>
+    </div>
+
+    <!-- Per-market stat cards -->
+    <div class="modal-stats" id="modalStats"></div>
+
+    <!-- Overlaid chart -->
+    <div class="chart-wrap">
+      <div class="chart-title">IMPLIED PROBABILITY MOVEMENT</div>
+      <div class="chart-canvas-wrap">
+        <canvas id="modalChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let allScores    = [];
+let results      = {};       // {player: {finish, payout, notes}}
+let showAmerican = true;
+let activeEvent  = null;
+let sortKey      = 'winner_current_american';
+let sortDir      = 1;
+let modalChart   = null;
+let modalPlayer  = null;
+let modalPlayers = [];   // ordered list of player names matching current table sort
+let swipeStartX  = 0;
+
+// ── Odds helpers ───────────────────────────────────────────────────────────
+function impliedToAmerican(imp) {
+  if (!imp || imp <= 0) return '—';
+  const p = imp / 100;
+  if (p >= 0.5) return String(Math.round(-p / (1-p) * 100));
+  return '+' + Math.round((1-p) / p * 100);
+}
+function fmtOdds(implied) {
+  if (!implied || implied === 0) return '—';
+  return showAmerican ? impliedToAmerican(implied) : implied.toFixed(1) + '%';
+}
+function fmtAmerican(val) {
+  if (!val || val === 0) return '—';
+  return val > 0 ? '+' + val : String(val);
+}
+function fmtAmericanSum(val) {
+  if (!val || val === 0) return '—';
+  return val > 0 ? '+' + val : String(val);
+}
+function fmtDelta(move) {
+  if (move === 0 || move == null) return '—';
+  return (move > 0 ? '+' : '') + move.toFixed(1) + '%';
+}
+function moveClass(v) {
+  if (v > 0.05)  return 'positive';
+  if (v < -0.05) return 'negative';
+  return '';
+}
+
+// ── Event selector ─────────────────────────────────────────────────────────
+async function loadEvents() {
+  try {
+    const events = await (await fetch('/api/events')).json();
+    const sel = document.getElementById('eventSelect');
+    if (!events.length) { sel.innerHTML = '<option>No events yet</option>'; return; }
+    // Pick current week event: prefer datagolf_ key (weekly tour), else most recently seen
+    const current = events.find(e => e.key.startsWith('datagolf_')) || events[0];
+    sel.innerHTML = events.map(e =>
+      `<option value="${e.key}" ${e.key===current.key?'selected':''}>${e.title}</option>`
+    ).join('');
+    activeEvent = current.key;
+    sel.addEventListener('change', () => {
+      activeEvent = sel.value;
+      loadScores();
+      loadResults();
+    });
+  } catch(e) { console.error('loadEvents', e); }
+}
+
+function eventParam(sep='?') {
+  return activeEvent ? sep + 'event=' + encodeURIComponent(activeEvent) : '';
+}
+
+// ── Load data ──────────────────────────────────────────────────────────────
+async function loadScores() {
+  try {
+    allScores = await (await fetch('/api/scores' + eventParam())).json();
+    renderTable();
+    renderPicks();
+    const nextMins = 50 - (new Date().getMinutes() % 50);
+    document.getElementById('lastUpdate').textContent = 'Next update in ~' + nextMins + ' min';
+  } catch(e) {
+    document.getElementById('tableBody').innerHTML =
+      '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--red)">Could not load data</td></tr>';
+  }
+}
+
+async function loadResults() {
+  try {
+    results = await (await fetch('/api/results' + eventParam())).json();
+    renderTable();
+  } catch(e) {}
+}
+
+// ── Sorting ────────────────────────────────────────────────────────────────
+const COL_KEYS = ['_','player','result','baseline','current_total','delta',
+                  'winner_open','winner_current','winner_move',
+                  'top5_open','top5_current','top5_move',
+                  'top10_open','top10_current','top10_move'];
+
+function sortBy(key) {
+  sortDir = (sortKey === key) ? sortDir * -1 : -1;
+  if (key === 'player' || key === 'result') sortDir = (sortKey === key) ? sortDir * -1 : 1;
+  sortKey = key;
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sort-asc','sort-desc'));
+  const idx = COL_KEYS.indexOf(key);
+  if (idx >= 0) document.querySelectorAll('th')[idx].classList.add(sortDir===1?'sort-asc':'sort-desc');
+  renderTable();
+}
+
+function getVal(p, key) {
+  const res = results[p.player];
+  return {
+    player: p.player,
+    result: res ? res.finish : '',
+    baseline: p.baseline, current_total: p.current_total, delta: p.delta,
+    baseline_impl: p.winner.open_implied + p.top5.open_implied + p.top10.open_implied,
+    current_impl: p.winner.current_implied + p.top5.current_implied + p.top10.current_implied,
+    winner_open: p.winner.open_implied, winner_current: p.winner.current_implied, winner_move: p.winner.move,
+    top5_open: p.top5.open_implied, top5_current: p.top5.current_implied, top5_move: p.top5.move,
+    top10_open: p.top10.open_implied, top10_current: p.top10.current_implied, top10_move: p.top10.move,
+    winner_current_american: p.winner_current_american,
+    top5_current_american: p.top5_current_american,
+    top10_current_american: p.top10_current_american,
+  }[key] ?? p.score;
+}
+
+// ── Render table ───────────────────────────────────────────────────────────
+function renderTable() {
+  const scores = [...allScores].sort((a,b) => {
+    const av = getVal(a,sortKey), bv = getVal(b,sortKey);
+    if (typeof av === 'string') return av.localeCompare(bv) * sortDir;
+    return (av - bv) * sortDir;
+  });
+
+  const tbody = document.getElementById('tableBody');
+  if (!scores.length) {
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--sub)">No data — hit Pull Now.</td></tr>';
+    return;
+  }
+
+  modalPlayers = scores.map(p => p.player);
+  tbody.innerHTML = scores.map((p, i) => {
+    const p5  = p.top5.open_implied  === 0 && p.top5.current_implied  === 0;
+    const p10 = p.top10.open_implied === 0 && p.top10.current_implied === 0;
+    const res = results[p.player];
+    const resCell = res
+      ? `<td class="result-cell group-start">${res.finish}${res.payout ? ' / $'+res.payout : ''}</td>`
+      : `<td class="result-cell empty group-start">—</td>`;
+    const badge = p.qualifies ? '<span class="qualify-badge">PICK</span>' : (p.is_longshot ? '<span class="longshot-badge">LONGSHOT</span>' : '');
+    return `<tr class="${p.qualifies?'qualifying':''}" onclick="openModal('${p.player.replace(/'/g,"\\'")}')">
+      <td class="mono" style="color:var(--sub)">${i+1}</td>
+      <td><span class="player-name">${p.player}</span>${badge}</td>
+      ${resCell}
+      <td class="mono">${showAmerican ? fmtAmericanSum(p.baseline) : p.baseline_impl.toFixed(1)+'%'}</td>
+      <td class="mono">${showAmerican ? fmtAmericanSum(p.current_total) : p.current_impl.toFixed(1)+'%'}</td>
+      <td class="mono ${moveClass(p.delta)}">${fmtDelta(p.delta)}</td>
+      <td class="mono group-start">${fmtOdds(p.winner.open_implied)}</td>
+      <td class="mono ${moveClass(p.winner.move)}">${fmtOdds(p.winner.current_implied)}</td>
+      <td class="mono ${moveClass(p.winner.move)}">${fmtDelta(p.winner.move)}</td>
+      ${p5
+        ? '<td class="pending-cell group-start">pend</td><td class="pending-cell">pend</td><td class="pending-cell">—</td>'
+        : `<td class="mono group-start">${fmtOdds(p.top5.open_implied)}</td><td class="mono ${moveClass(p.top5.move)}">${fmtOdds(p.top5.current_implied)}</td><td class="mono ${moveClass(p.top5.move)}">${fmtDelta(p.top5.move)}</td>`}
+      ${p10
+        ? '<td class="pending-cell group-start">pend</td><td class="pending-cell">pend</td><td class="pending-cell">—</td>'
+        : `<td class="mono group-start">${fmtOdds(p.top10.open_implied)}</td><td class="mono ${moveClass(p.top10.move)}">${fmtOdds(p.top10.current_implied)}</td><td class="mono ${moveClass(p.top10.move)}">${fmtDelta(p.top10.move)}</td>`}
+    </tr>`;
+  }).join('');
+}
+
+// ── Picks banner ───────────────────────────────────────────────────────────
+function renderPicks() {
+  const picks     = allScores.filter(p => p.qualifies).slice(0,10);
+  const longshots = allScores.filter(p => p.is_longshot).slice(0,5);
+
+  // ── Top 10 Picks ──
+  const el = document.getElementById('picksList');
+  if (!picks.length) {
+    const pending = allScores.some(p => !p.all_markets);
+    el.innerHTML = pending
+      ? '<span class="pick-pending">⏳ Waiting for Top 5 & Top 10 markets to be posted...</span>'
+      : '<span class="pick-pending">No qualifying picks yet — all 3 buckets must improve from opening lines.</span>';
+  } else {
+    el.innerHTML = picks.map((p,i) => `
+      <div class="pick-chip" onclick="openModal('${p.player.replace(/'/g,"\'")}')">
+        <span class="pick-rank">${i+1}</span>
+        <div class="pick-info">
+          <span class="pick-name">${p.player}</span>
+          <span class="pick-delta">Δ ${fmtDelta(p.delta)} · open ${impliedToAmerican(p.winner.open_implied)}</span>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Top 5 Longshots ──
+  const lel = document.getElementById('longshotsList');
+  if (!longshots.length) {
+    lel.innerHTML = '<span class="pick-pending">No longshots yet — same criteria as picks but win odds > +5000.</span>';
+  } else {
+    lel.innerHTML = longshots.map((p,i) => `
+      <div class="pick-chip" style="border-color:rgba(245,200,66,0.4);background:rgba(245,200,66,0.06)" onclick="openModal('${p.player.replace(/'/g,"\'")}')">
+        <span class="pick-rank" style="background:var(--yellow)">${i+1}</span>
+        <div class="pick-info">
+          <span class="pick-name" style="color:var(--yellow)">${p.player}</span>
+          <span class="pick-delta">Δ ${fmtDelta(p.delta)} · open ${impliedToAmerican(p.winner.open_implied)}</span>
+        </div>
+      </div>`).join('');
+  }
+}
+
+// ── Toggle ─────────────────────────────────────────────────────────────────
+function toggleDisplay() {
+  showAmerican = !showAmerican;
+  const btn = document.getElementById('oddsToggleBtn');
+  btn.textContent = showAmerican ? 'Show Implied %' : 'Show American';
+  btn.style.borderColor = showAmerican ? 'var(--border)' : 'var(--green)';
+  btn.style.color = showAmerican ? 'var(--sub)' : 'var(--green)';
+  renderTable();
+  if (document.getElementById('modalOverlay').classList.contains('active')) {
+    updateModalStats(modalPlayer);
+  }
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+async function openModal(player) {
+  const p = allScores.find(x => x.player === player);
+  if (!p) return;
+  modalPlayer = player;
+  document.getElementById('modalName').textContent  = player;
+  document.getElementById('modalEvent').textContent = p.event_title || '';
+  document.getElementById('modalOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+  updateModalStats(player);
+
+  // Load chart
+  try {
+    const data = await (await fetch('/api/history/' + encodeURIComponent(player) + eventParam())).json();
+    drawChart(data);
+  } catch(e) { console.error(e); }
+}
+
+function updateModalStats(player) {
+  const p = allScores.find(x => x.player === player);
+  if (!p) return;
+  const mkts = [
+    { label:'🏆 Winner', open:p.winner.open_implied, cur:p.winner.current_implied, move:p.winner.move, pending:false },
+    { label:'🥇 Top 5',  open:p.top5.open_implied,   cur:p.top5.current_implied,   move:p.top5.move,   pending:p.top5.open_implied===0 && p.top5.current_implied===0 },
+    { label:'🏅 Top 10', open:p.top10.open_implied,  cur:p.top10.current_implied,  move:p.top10.move,  pending:p.top10.open_implied===0 && p.top10.current_implied===0 },
+  ];
+  document.getElementById('modalStats').innerHTML = mkts.map(m => `
+    <div class="stat-card">
+      <div class="stat-label">${m.label}</div>
+      ${m.pending
+        ? '<div style="color:var(--sub);font-size:11px;padding-top:4px">Lines not yet posted</div>'
+        : `<div class="stat-row">
+            <div class="stat-group"><div class="stat-sublabel">Open</div><div class="stat-val small">${fmtOdds(m.open)}</div></div>
+            <div class="stat-group"><div class="stat-sublabel">Now</div><div class="stat-val ${moveClass(m.move)}">${fmtOdds(m.cur)}</div></div>
+          </div>
+          <div class="stat-move ${moveClass(m.move)}">${fmtDelta(m.move)} since open</div>`}
+    </div>`).join('');
+}
+
+function drawChart(data) {
+  if (modalChart) { modalChart.destroy(); modalChart = null; }
+  const allTs = [...new Set([
+    ...data.winner.map(s=>s.ts),
+    ...data.top5.map(s=>s.ts),
+    ...data.top10.map(s=>s.ts),
+  ])].sort();
+
+  // Build dataset with per-point colors and dashed-border detection
+  // Green  = implied % up vs prev (sharp money coming in)
+  // Red    = implied % down vs prev (money coming off)
+  // Diamond shape = book count increased (line shift due to new book, not sharp move)
+  function ds(snaps, label, lineColor, yAxisID) {
+    const byTs    = Object.fromEntries(snaps.map(s => [s.ts, s]));
+    const vals    = allTs.map(ts => byTs[ts] ? parseFloat(byTs[ts].implied.toFixed(1)) : null);
+    const books   = allTs.map(ts => byTs[ts] ? (byTs[ts].books || 0) : null);
+
+    const pointBg     = [];
+    const pointBorder = [];
+    const pointRadius = [];
+    const pointStyle  = [];
+
+    vals.forEach((v, i) => {
+      if (v == null) {
+        pointBg.push(lineColor); pointBorder.push(lineColor);
+        pointRadius.push(0); pointStyle.push('circle');
+        return;
+      }
+      // Was there a book count increase?
+      const prevBooks = books.slice(0, i).reverse().find(b => b != null) || 0;
+      const newBook   = books[i] > prevBooks;
+
+      // Did the value move?
+      const prevVal = vals.slice(0, i).reverse().find(x => x != null);
+      let fillColor = lineColor;
+      if (prevVal != null) {
+        if (v > prevVal) fillColor = '#00e5a0';       // green — improved
+        else if (v < prevVal) fillColor = '#ff4d6d';  // red — worse
+      }
+
+      pointBg.push(newBook ? 'transparent' : fillColor);
+      pointBorder.push(newBook ? fillColor : fillColor);
+      pointRadius.push(4);
+      // Chart.js doesn't support dashed circles natively — use rotRect as proxy for "hollow"
+      pointStyle.push(newBook ? 'rectRot' : 'circle');
+    });
+
+    return {
+      label, spanGaps:true, fill:false, tension:0.3,
+      borderColor:lineColor, backgroundColor:lineColor+'18',
+      borderWidth:2, pointRadius, pointHoverRadius:7,
+      pointBackgroundColor: pointBg,
+      pointBorderColor:     pointBorder,
+      pointBorderWidth:     1.5,
+      pointStyle,
+      yAxisID: yAxisID || 'y',
+      data: vals,
+    };
+  }
+
+  // Winner on left axis (lower %, tighter range), T5+T10 on right axis (higher %)
+  const winnerDs = data.winner.length ? [ds(data.winner, 'Winner', '#9ca3af', 'yWinner')] : [];
+  const t5t10Ds  = [
+    ...(data.top5.length  ? [ds(data.top5,  'Top 5',  '#6b7280', 'yFinish')] : []),
+    ...(data.top10.length ? [ds(data.top10, 'Top 10', '#4b5563', 'yFinish')] : []),
+  ];
+  const datasets = [...winnerDs, ...t5t10Ds];
+
+  // Compute floating bounds: centre on mean, ±10% for winner, ±30% for finish
+  function bounds(ds, range) {
+    const vals = ds.flatMap(d => d.data).filter(v => v != null);
+    if (!vals.length) return { min: 0, max: range };
+    const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+    return { min: Math.max(0, mean - range/2), max: mean + range/2 };
+  }
+  const wb = bounds(winnerDs, 10);
+  const fb = bounds(t5t10Ds,  30);
+
+  modalChart = new Chart(document.getElementById('modalChart'), {
+    type: 'line',
+    data: {
+      labels: allTs.map(ts => new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',hour12:true})),
+      datasets,
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { display:true, position:'top', labels:{ color:'#718096', font:{family:'DM Sans',size:11}, boxWidth:10, padding:12 } },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y != null ? ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` : null } }
+      },
+      scales: {
+        x: {
+          ticks:{ color:'#4a5568', font:{size:9}, maxTicksLimit:6 },
+          grid:{ color:'#1e2a38' }
+        },
+        yWinner: {
+          type:'linear', position:'left',
+          min: wb.min, max: wb.max,
+          ticks:{ color:'#9ca3af', font:{size:9,family:'DM Mono'}, callback:v=>v.toFixed(1)+'%', maxTicksLimit:5 },
+          grid:{ color:'#1e2a38' },
+          title:{ display:true, text:'Win %', color:'#9ca3af', font:{size:9} }
+        },
+        yFinish: {
+          type:'linear', position:'right',
+          min: fb.min, max: fb.max,
+          ticks:{ color:'#6b7280', font:{size:9,family:'DM Mono'}, callback:v=>v.toFixed(1)+'%', maxTicksLimit:5 },
+          grid:{ drawOnChartArea:false },
+          title:{ display:true, text:'T5/T10 %', color:'#6b7280', font:{size:9} }
+        }
+      }
+    }
+  });
+}
+
+// ── Player navigation ─────────────────────────────────────────────────────
+function navigatePlayer(dir) {
+  const idx = modalPlayers.indexOf(modalPlayer);
+  if (idx === -1) return;
+  const next = modalPlayers[idx + dir];
+  if (next) openModal(next);
+}
+function handleSwipe(e) {
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  if (Math.abs(dx) > 50) navigatePlayer(dx < 0 ? 1 : -1);
+}
+
+// ── Close modal ────────────────────────────────────────────────────────────
+function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
+function closeModalDirect() {
+  document.getElementById('modalOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+  modalPlayer = null;
+}
+
+// ── Pull Now ───────────────────────────────────────────────────────────────
+async function pullNow() {
+  const btn = document.getElementById('pullBtn');
+  btn.disabled = true; btn.textContent = '⏳ Pulling...';
+  try {
+    const data = await (await fetch('/api/pull', {method:'POST'})).json();
+    if (data.status === 'already_running') {
+      btn.textContent = '⏳ Running...';
+      setTimeout(() => { btn.textContent='⬇ Pull Now'; btn.disabled=false; }, 5000);
+    } else {
+      btn.textContent = '⏳ Fetching...';
+      setTimeout(async () => {
+        await loadScores();
+        await loadResults();
+        btn.textContent = '✓ Done!';
+        setTimeout(() => { btn.textContent='⬇ Pull Now'; btn.disabled=false; }, 3000);
+      }, 30000);
+    }
+  } catch(e) {
+    btn.textContent = '✗ Error';
+    setTimeout(() => { btn.textContent='⬇ Pull Now'; btn.disabled=false; }, 3000);
+  }
+}
+
+// ── Keyboard nav ──────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('modalOverlay').classList.contains('active')) return;
+  if (e.key === 'ArrowLeft')  navigatePlayer(-1);
+  if (e.key === 'ArrowRight') navigatePlayer(1);
+  if (e.key === 'Escape')     closeModalDirect();
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+(async () => {
+  await loadEvents();
+  await Promise.all([loadScores(), loadResults()]);
+})();
+setInterval(() => { loadScores(); loadResults(); }, 5 * 60 * 1000);
+</script>
+</body>
+</html>
